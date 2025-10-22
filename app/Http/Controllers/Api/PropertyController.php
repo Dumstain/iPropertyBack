@@ -28,8 +28,11 @@ class PropertyController extends Controller
      * Guarda una nueva propiedad en la base de datos.
      * Ruta: POST /api/properties
      */
-    public function store(Request $request): JsonResponse
-    {
+public function store(Request $request): JsonResponse
+{
+    \Log::info('Solicitud POST recibida en store:', ['data' => $request->all(), 'token' => $request->header('Authorization')]);
+
+    try {
         // 1. Validación exhaustiva para garantizar la calidad de los datos
         $validatedData = $request->validate($this->validationRules());
 
@@ -44,18 +47,22 @@ class PropertyController extends Controller
         // 4. Crear la propiedad
         $property = Property::create($validatedData);
 
-                // 5. ¡NUEVO! Buscar prospectos sugeridos para la propiedad recién creada.
+        // 5. Buscar prospectos sugeridos para la propiedad recién creada
         $suggestions = $this->suggestedProspects($property)->getData();
 
-        // 6. Devolver la propiedad creada Y las sugerencias
+        // 6. Devolver la propiedad creada y las sugerencias
         return response()->json([
             'property' => $property,
             'suggested_prospects' => $suggestions,
         ], 201);
-
-
-        return response()->json($property, 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        \Log::error('Validación fallida en store:', ['errors' => $e->errors()]);
+        return response()->json(['error' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        \Log::error('Error en store:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        return response()->json(['error' => 'Error interno al crear la propiedad', 'details' => $e->getMessage()], 500);
     }
+}
 
     /**
      * Muestra los detalles de una propiedad específica.
